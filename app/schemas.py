@@ -11,33 +11,19 @@ def validate_object_id(value: str) -> str:
     
 MongoId = Annotated[str, BeforeValidator(validate_object_id)]
 
-class EntryStart(BaseModel):
-    name: str = Field(..., example="Work on project")
-    project_group_id: MongoId
 
-class EntryUpdate(BaseModel):
-    name: Optional[str] = Field(..., example="Work on project")
-    project_group_id: Optional[MongoId] =Field(None, example="691cc7113ddac7733853998b")
+#*********************Notification models*************************
+class NotificationUpdate(BaseModel):
+    opened: bool
 
-class Entry(BaseModel):
+class GetNotifications(BaseModel):
     id: MongoId
-    project_group_id: MongoId
-    name: str
-    starttime: datetime
-    endtime: Optional[datetime] = None
-    duration: Optional[int] = None  # time in seconds
+    related_id: MongoId
+    timestamp: datetime
 
-
-#*********************Project managment models*************************
-class ProjectCreate(BaseModel):
-    name: str = Field(..., example="Serial Link"),
-    description: str = Field(..., example="My main project")
-
-class Project(BaseModel):
+class Notification(BaseModel):
     id: MongoId
-    owner_id: MongoId
-    name: str
-    description: str
-    
-class ProjectOfUser(BaseModel):
-    owner_id: MongoId
+    user_id: MongoId
+    related_id: MongoId  # project or entry id
+    timestamp: datetime
+    opened: bool = False
