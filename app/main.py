@@ -56,4 +56,9 @@ def delete_notification(notification_id: str):
     return {"message": "Notification deleted"}
 
 
+@app.delete("/notifications", status_code=200)
+def delete_notifications():
+    notifications_collection.delete_many({"user_id": currentUser})
+    return {"message": "Notifications deleted"}
+
 # python -m uvicorn app.main:app --reload
