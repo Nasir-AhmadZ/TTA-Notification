@@ -16,10 +16,16 @@ MongoId = Annotated[str, BeforeValidator(validate_object_id)]
 class NotificationUpdate(BaseModel):
     opened: bool
 
-class GetNotifications(BaseModel):
+class GetNotificationsWithoutState(BaseModel):
     id: MongoId
     related_id: MongoId
     timestamp: datetime
+
+class GetNotificationsWithState(BaseModel):
+    id: MongoId
+    related_id: MongoId
+    timestamp: datetime
+    opened: bool
 
 class Notification(BaseModel):
     id: MongoId
