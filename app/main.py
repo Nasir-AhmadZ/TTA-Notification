@@ -55,10 +55,16 @@ def delete_notification(notification_id: str):
     notifications_collection.delete_one({"_id": ObjectId(notification_id)})
     return {"message": "Notification deleted"}
 
-
+# delete all notifications belongin to a user
 @app.delete("/notifications", status_code=200)
 def delete_notifications():
     notifications_collection.delete_many({"user_id": currentUser})
+    return {"message": "Notifications deleted"}
+
+#delete notifications by related_id
+@app.delete("/notifications/related/{related_id}")
+def delete_notifications_by_related_Id(related_id: str):
+    notifications_collection.delete_many({"related_id": related_id})
     return {"message": "Notifications deleted"}
 
 # python -m uvicorn app.main:app --reload
