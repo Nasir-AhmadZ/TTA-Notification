@@ -34,11 +34,27 @@ def get_read_notifications():
         raise HTTPException(status_code=404, detail="No notifications found")
     return notifications
 
+
+@app.patch("/notifications/{notification_id}", response_model=dict, status_code=200)
+def update_notification_status(notification_id: str, update: NotificationUpdate):
+    notification = notifications_collection.find_one({"_id": ObjectId(notification_id)})
+    
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    notifications_collection.update_one(
+        {"_id": ObjectId(notification_id)},
+        {"$set": {"opened": update.opened}}
+    )
+    
+    return {"message": "Notification status updated"}
+
 #delete notification by id
 @app.delete("/notifications/{notification_id}", status_code=200)
 def delete_notification(notification_id: str):
     notifications_collection.delete_one({"_id": ObjectId(notification_id)})
     return {"message": "Notification deleted"}
+
 
 
 # @app.get("/entry/{entry_id}", response_model=Entry, status_code=200)
