@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from datetime import datetime
 from bson import ObjectId
 
-from .schemas import GetNotifications, Notification, NotificationUpdate
+from .schemas import GetNotificationsWithoutState, Notification, NotificationUpdate
 from .models import entry_helper, project_helper
 from .configurations import db, notifications_collection
 app = FastAPI(title="Notifications API")
@@ -11,7 +11,7 @@ currentUser = "691c8bf8d691e46d00068bf3"
 
 #******************************Notification endpoints**********************************
 #get all notifications
-@app.get("/notifications", response_model=list[GetNotifications], status_code=200)
+@app.get("/notifications", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_notifications():
     notifications = list(notifications_collection.find({"user_id": currentUser}))
     if not notifications:
@@ -19,7 +19,7 @@ def get_notifications():
     return notifications
 
 # Get unread notifications
-@app.get("/notifications/unread", response_model=list[GetNotifications], status_code=200)
+@app.get("/notifications/unread", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_unread_notifications():
     notifications = list(notifications_collection.find({"user_id": currentUser, "opened": False}))
     if not notifications:
@@ -27,7 +27,7 @@ def get_unread_notifications():
     return notifications
 
 #get read notifications
-@app.get("/notifications/read", response_model=list[GetNotifications], status_code=200)
+@app.get("/notifications/read", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_read_notifications():
     notifications = list(notifications_collection.find({"user_id": currentUser, "opened": True}))
     if not notifications:
@@ -55,19 +55,5 @@ def delete_notification(notification_id: str):
     notifications_collection.delete_one({"_id": ObjectId(notification_id)})
     return {"message": "Notification deleted"}
 
-
-
-# @app.get("/entry/{entry_id}", response_model=Entry, status_code=200)
-# def get_entry_by_id(entry_id: str):
-
-#     #validate ObjectId format
-#     if not ObjectId.is_valid(entry_id):
-#         raise HTTPException(status_code=400, detail="Invalid entry id")
-
-#     entry = entries_collection.find_one({"_id": ObjectId(entry_id)})
-#     if not entry:
-#         raise HTTPException(status_code=404, detail="Entry not found")
-
-#     return entry_helper(entry)
 
 # python -m uvicorn app.main:app --reload
