@@ -89,10 +89,13 @@ async def consume_notifications():
     channel = await connection.channel()
     
     exchange = await channel.declare_exchange("notificiations_topic", aio_pika.ExchangeType.TOPIC)
-    queue = await channel.declare_queue("entry_notifications", durable=True)
-    await queue.bind(exchange, routing_key="entry.completed")
+    queue = await channel.declare_queue("all_notifications", durable=True)
     
-    print("waiting for messages on entry_notifications ...")
+    #bind to all event types
+    await queue.bind(exchange, routing_key="entry.*")
+    await queue.bind(exchange, routing_key="project.*")
+    
+    print("waiting for messages on all_notifications ...")
     
     async with queue.iterator() as q:
         async for message in q:
@@ -100,10 +103,19 @@ async def consume_notifications():
                 body_bytes = bytes(message.body)
                 data = json.loads(body_bytes.decode("utf-8"))
                 
+                #create notifcation based on event type
+                message_text = {
+                    "entry.completed": f"Entry '{data['data']['name']}' completed",
+                    "entry.running": f"Entry '{data['data']['name']}' started",
+                    "entry.updated": f"Entry '{data['data']['name']}' updated",
+                    "project.created": f"Project '{data['data']['name']}' created"
+                }.get(data["event_type"], f"Event: {data['event_type']}")
+                
                 notification = {
                     "user_id": data["user_id"],
-                    "message": f"Entry '{data['data']['name']}' completed",
+                    "message": message_text,
                     "related_id": data["data"]["id"],
+                    "event_type": data["event_type"],
                     "opened": False,
                     "created_at": datetime.now()
                 }
