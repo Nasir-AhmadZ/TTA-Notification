@@ -11,7 +11,7 @@ from .models import notification_helper
 from .schemas import GetNotificationsWithoutState, Notification, NotificationUpdate
 from .configurations import db, notifications_collection
 app = FastAPI(title="Notifications API")
-
+ 
 currentUser = "691c8bf8d691e46d00068bf3"
 
 RABBIT_URL = os.getenv("RABBIT_URL")
