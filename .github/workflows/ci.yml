@@ -1,9 +1,9 @@
 name: CI
 on:
   push:
-    branches: ["master"]
+    branches: ["rabbitmq"]
   pull_request:
-    branches: ["master"]
+    branches: ["rabbitmq"]
 jobs:
   build:
     runs-on: ubuntu-latest
