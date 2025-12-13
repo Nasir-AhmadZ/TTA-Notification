@@ -37,7 +37,7 @@ def get_unread_notifications():
     notifications = list(notifications_collection.find({"user_id": currentUser, "opened": False}))
     if not notifications:
         raise HTTPException(status_code=404, detail="No notifications found")
-    return notifications
+    return [notification_helper(n) for n in notifications]
 
 #get read notifications
 @app.get("/notifications/read", response_model=list[GetNotificationsWithoutState], status_code=200)
@@ -45,7 +45,7 @@ def get_read_notifications():
     notifications = list(notifications_collection.find({"user_id": currentUser, "opened": True}))
     if not notifications:
         raise HTTPException(status_code=404, detail="No notifications found")
-    return notifications
+    return [notification_helper(n) for n in notifications]
 
 
 @app.patch("/notifications/{notification_id}", response_model=dict, status_code=200)

@@ -11,6 +11,6 @@ def client():
     
     configurations.db = mock_db
     configurations.notifications_collection = mock_db["notifications"]
-
+    
     with TestClient(app) as c:
         yield c
