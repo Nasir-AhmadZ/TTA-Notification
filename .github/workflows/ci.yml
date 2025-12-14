@@ -34,7 +34,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           load: true
-          tags: mcarroll321/tta-tg:latest
+          tags: mcarroll321/tta-notif:latest
           push: true
       
       - name: Inspect
