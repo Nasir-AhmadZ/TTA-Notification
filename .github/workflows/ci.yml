@@ -17,3 +17,26 @@ jobs:
         run: pip install -r requirements.txt
       - name: Tests (pytest + coverage)
         run: python -m pytest --cov=app tests/
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          load: true
+          tags: mcarroll321/tta-tg:latest
+          push: true
+      
+      - name: Inspect
+        run: |
+          docker image inspect mcarroll321/tta-tts:latest
