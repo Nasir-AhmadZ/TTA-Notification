@@ -42,9 +42,9 @@ provider "kubernetes" {
 
 resource "kubernetes_deployment" "nginx" {
   metadata {
-    name = "ttatrackapp"
+    name = "ttanotifapp"
     labels = {
-      App = "TTA-Track-app"
+      App = "TTA-Notif-app"
     }
   }
 
@@ -52,7 +52,7 @@ resource "kubernetes_deployment" "nginx" {
     replicas = 2
     selector {
       match_labels = {
-        App = "TTA-Track-app"
+        App = "TTA-Notif-app"
       }
     }
     template {
@@ -63,8 +63,8 @@ resource "kubernetes_deployment" "nginx" {
       }
       spec {
         container {
-          image = "mcarroll321/tta-track"
-          name  = "ttatrackcontainer"
+          image = "mcarroll321/tta-notif"
+          name  = "ttanotifcontainer"
 
           port {
             container_port = 8001
@@ -88,7 +88,7 @@ resource "kubernetes_deployment" "nginx" {
 
 resource "kubernetes_service" "nginx" {
   metadata {
-    name = "ttatrackservice"
+    name = "ttanotifservice"
   }
   spec {
     selector = {
