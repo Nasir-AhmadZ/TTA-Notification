@@ -16,6 +16,8 @@ currentUser = "691c8bf8d691e46d00068bf3"
 
 RABBIT_URL = os.getenv("RABBIT_URL")
 EXCHANGE_NAME = "notificiations_topic"
+USE_EXCHANGE = os.getenv("USE_EXCHANGE", "true").lower() in ("1", "true", "yes")
+
 if not RABBIT_URL:
     raise RuntimeError("RABBIT_URL is not set. Export it (e.g. export RABBIT_URL='amqps://user:pass@host/vhost') or load your .env.")
 
@@ -81,49 +83,61 @@ def delete_notifications_by_related_Id(related_id: str):
     return {"message": "Notifications deleted"}
 
 ##************************Rabbitmq messaging********************************
-
+def build_message_text(event_type: str, data: dict) -> str:
+    name = (data or {}).get("name", "unknown")
+    return {
+        "entry.completed": f"Entry '{name}' completed",
+        "entry.running": f"Entry '{name}' started",
+        "entry.updated": f"Entry '{name}' updated",
+        "project.created": f"Project '{name}' created",
+    }.get(event_type, f"Event: {event_type}")
 
 
 async def consume_notifications():
     connection = await aio_pika.connect_robust(RABBIT_URL)
     channel = await connection.channel()
-    
-    exchange = await channel.declare_exchange("notificiations_topic", aio_pika.ExchangeType.TOPIC)
+
+    exchange = await channel.declare_exchange(EXCHANGE_NAME, aio_pika.ExchangeType.TOPIC)
     queue = await channel.declare_queue("all_notifications", durable=True)
-    
-    #bind to all event types
-    await queue.bind(exchange, routing_key="entry.*")
-    await queue.bind(exchange, routing_key="project.*")
-    
+        
     print("waiting for messages on all_notifications ...")
+    await queue.bind(exchange, routing_key="#")
     
     async with queue.iterator() as q:
         async for message in q:
             async with message.process():
-                body_bytes = bytes(message.body)
-                data = json.loads(body_bytes.decode("utf-8"))
-                
-                #create notifcation based on event type
-                message_text = {
-                    "entry.completed": f"Entry '{data['data']['name']}' completed",
-                    "entry.running": f"Entry '{data['data']['name']}' started",
-                    "entry.updated": f"Entry '{data['data']['name']}' updated",
-                    "project.created": f"Project '{data['data']['name']}' created"
-                }.get(data["event_type"], f"Event: {data['event_type']}")
-                
+                raw = message.body.decode("utf-8")
+                payload = json.loads(raw)
+
+                event_type = payload.get("event_type")
+                user_id = payload.get("data", {}).get("currentUser")
+                data = payload.get("data")
+
+                if isinstance(data, dict):
+                    data = data["data"]
+
+                if not event_type or not user_id:
+                    print("Skipping message missing event_type/currentUser:", payload)
+                    continue
+
+                message_text = build_message_text(event_type, data)
+
+                related_id = data.get("id") or data.get("_id")  # depending on your helper shape
+
                 notification = {
-                    "user_id": data["user_id"],
+                    "user_id": user_id,
                     "message": message_text,
-                    "related_id": data["data"]["id"],
-                    "event_type": data["event_type"],
+                    "related_id": related_id,
+                    "event_type": event_type,
                     "opened": False,
-                    "created_at": datetime.now()
+                    "created_at": datetime.now(),
                 }
+
                 notifications_collection.insert_one(notification)
+                print("Inserted notification:", notification)
 
 @app.on_event("startup")
 async def startup_event():
-    import asyncio
     asyncio.create_task(consume_notifications())
 
 # python -m uvicorn app.main:app --reload

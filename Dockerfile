@@ -14,5 +14,5 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 COPY . .
 USER appuser
-EXPOSE 8002
-CMD ["uvicorn", "app.main:app", "--host=0.0.0.0", "--port=8002"]
+EXPOSE 8003
+CMD ["uvicorn", "app.main:app", "--host=0.0.0.0", "--port=8003"]
