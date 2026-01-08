@@ -1,18 +1,16 @@
-
 import os
+import sys
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson import ObjectId
 
-uri = os.getenv("MONGO_URI")
-
-# create a new client and connect to the server
-if uri:
-    client = MongoClient(uri, server_api=ServerApi('1'))
-    db = client.notifications
-    notifications_collection = db["notifications"]
+#auto-detect if running under pytest
+if "pytest" in sys.modules:
+    import mongomock
+    client = mongomock.MongoClient()
 else:
-    client = None
-    db = None
-    notifications_collection = None
+    uri = os.getenv("MONGO_URI")
+    client = MongoClient(uri, server_api=ServerApi('1'))
 
+db = client.user_db
+notifications_collection = db["notifications"]
