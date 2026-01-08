@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from bson import ObjectId
 import os
@@ -11,6 +12,14 @@ from .models import notification_helper
 from .schemas import GetNotificationsWithoutState, Notification, NotificationUpdate
 from .configurations import db, notifications_collection
 app = FastAPI(title="Notifications API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
  
 currentUser = "691c8bf8d691e46d00068bf3"
 
@@ -28,8 +37,6 @@ if not RABBIT_URL:
 @app.get("/notifications", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_notifications():
     notifications = list(notifications_collection.find({"user_id": currentUser}))
-    if not notifications:
-        raise HTTPException(status_code=404, detail="No notifications found")
     return [notification_helper(n) for n in notifications]
 
 
@@ -37,16 +44,12 @@ def get_notifications():
 @app.get("/notifications/unread", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_unread_notifications():
     notifications = list(notifications_collection.find({"user_id": currentUser, "opened": False}))
-    if not notifications:
-        raise HTTPException(status_code=404, detail="No notifications found")
     return [notification_helper(n) for n in notifications]
 
 #get read notifications
 @app.get("/notifications/read", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_read_notifications():
     notifications = list(notifications_collection.find({"user_id": currentUser, "opened": True}))
-    if not notifications:
-        raise HTTPException(status_code=404, detail="No notifications found")
     return [notification_helper(n) for n in notifications]
 
 

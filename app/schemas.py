@@ -19,11 +19,13 @@ class NotificationUpdate(BaseModel):
 class GetNotificationsWithoutState(BaseModel):
     id: MongoId
     related_id: MongoId
+    message: str
     timestamp: datetime
 
 class GetNotificationsWithState(BaseModel):
     id: MongoId
     related_id: MongoId
+    message: str
     timestamp: datetime
     opened: bool
 
@@ -31,5 +33,6 @@ class Notification(BaseModel):
     id: MongoId
     user_id: MongoId
     related_id: MongoId  # project or entry id
+    message: str
     timestamp: datetime
     opened: bool = False
