@@ -86,8 +86,8 @@ def get_unread_notifications():
 @app.get("/notifications/read", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_read_notifications():
     notifications = list(notifications_collection.find({"user_id": consumer.currentUser, "opened": True}))
-    if not notifications:
-        raise HTTPException(status_code=404, detail="No read notifications found")
+    #if not notifications:
+       #raise HTTPException(status_code=404, detail="No read notifications found")
     return [notification_helper(n) for n in notifications]
 
 
