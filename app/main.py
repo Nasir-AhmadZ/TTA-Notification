@@ -11,39 +11,46 @@ load_dotenv()
 from .models import notification_helper
 from .schemas import GetNotificationsWithoutState, Notification, NotificationUpdate
 from .configurations import db, notifications_collection
-from . import consumer 
+from . import consumer
+from . import consumerNotif
 from contextlib import asynccontextmanager
+
 app = FastAPI(title="Notifications API")
 
 #******************************RabbitMQ stuff******************************************
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    consumer_task = None
+    """Start background consumers on app startup and cancel them on shutdown."""
+    tasks = []
 
-    # Start the consumer within lifespan so it reliably runs under uvicorn
     try:
-        print("Starting RabbitMQ consumer task")
-        consumer_task = asyncio.create_task(consumer.consume())
-        app.state.consumer_task = consumer_task
+        print("Starting background RabbitMQ consumers")
+        # user events consumer (sets consumer.currentUser)
+        user_task = asyncio.create_task(consumer.consume())
+        tasks.append(user_task)
+
+        # notifications consumer (inserts into notifications_collection)
+        notif_task = asyncio.create_task(consumerNotif.consume())
+        tasks.append(notif_task)
+
+        app.state.consumer_tasks = tasks
     except Exception as e:
-        print(f"ERROR: Failed to start consumer task: {e}")
+        print(f"ERROR: Failed to start consumer tasks: {e}")
 
     try:
         yield
     finally:
-        # Shutdown: cancel consumer and close RabbitMQ publisher connection
-        try:
-            task = getattr(app.state, "consumer_task", None)
-            if task:
-                task.cancel()
-        except Exception:
-            print("ERROR: Error while cancelling consumer task")
-
-        try:
-            if connected:
-                publisher.close()
-        except Exception:
-            print("ERROR: Error while closing RabbitMQ connection")
+        for t in getattr(app.state, "consumer_tasks", []):
+            try:
+                t.cancel()
+            except Exception:
+                pass
+        # Await cancellation
+        for t in getattr(app.state, "consumer_tasks", []):
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
 
 app = FastAPI(title="Notifications API", lifespan=lifespan)
 
@@ -122,82 +129,5 @@ def delete_notifications():
 def delete_notifications_by_related_Id(related_id: str):
     notifications_collection.delete_many({"related_id": related_id})
     return {"message": "Notifications deleted"}
-
-##************************Rabbitmq messaging********************************
-def build_message_text(event_type: str, data: dict) -> str:
-    name = (data or {}).get("name", "unknown")
-    return {
-        "entry.completed": f"Entry '{name}' completed",
-        "entry.running": f"Entry '{name}' started",
-        "entry.updated": f"Entry '{name}' updated",
-        "project.created": f"Project '{name}' created",
-    }.get(event_type, f"Event: {event_type}")
-
-
-async def consume_notifications():
-    try:
-        print(f"Connecting to RabbitMQ: {RABBIT_URL}")
-        connection = await aio_pika.connect_robust(RABBIT_URL)
-        print("Connected to RabbitMQ successfully")
-        
-        async with connection:
-            channel = await connection.channel()
-            print(f"Declaring exchange: {EXCHANGE_NAME}")
-            
-            exchange = await channel.declare_exchange(EXCHANGE_NAME, aio_pika.ExchangeType.TOPIC)
-            queue = await channel.declare_queue("all_notifications", durable=True)
-            
-            print("Binding queue to exchange with routing_key='#'")
-            await queue.bind(exchange, routing_key="#")
-            print("Waiting for messages on all_notifications...")
-            
-            async with queue.iterator() as q:
-                async for message in q:
-                    async with message.process():
-                        try:
-                            raw = message.body.decode("utf-8")
-                            payload = json.loads(raw)
-                            print(f"Received message: {payload}")
-
-                            event_type = payload.get("event_type")
-                            user_id = payload.get("data", {}).get("currentUser")
-                            data = payload.get("data")
-
-                            if isinstance(data, dict) and "data" in data:
-                                data = data["data"]
-
-                            if not event_type or not user_id:
-                                print(f"Skipping message missing event_type/currentUser: {payload}")
-                                continue
-
-                            message_text = build_message_text(event_type, data)
-
-                            related_id = data.get("id") or data.get("_id")  # depending on your helper shape
-
-                            notification = {
-                                "user_id": user_id,
-                                "message": message_text,
-                                "related_id": related_id,
-                                "event_type": event_type,
-                                "opened": False,
-                                "created_at": datetime.now(),
-                            }
-
-                            notifications_collection.insert_one(notification)
-                            print(f"Inserted notification: {notification}")
-                        except Exception as e:
-                            print(f"Error processing message: {e}")
-    except Exception as e:
-        print(f"RabbitMQ connection error: {e}")
-        await asyncio.sleep(5)
-        # Retry connection
-        asyncio.create_task(consume_notifications())
-
-
-@app.on_event("startup")
-async def startup_event():
-    print("Starting RabbitMQ consumer...")
-    asyncio.create_task(consume_notifications())
-
 
 # python -m uvicorn app.main:app --reload
