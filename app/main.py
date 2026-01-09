@@ -76,7 +76,7 @@ if not RABBIT_URL:
 #******************************Notification endpoints**********************************
 #get all notifications
 @app.get("/notifications/{user_id}", response_model=list[GetNotificationsWithoutState], status_code=200)
-def get_notifications():
+def get_notifications(user_id: str):
     notifications = list(notifications_collection.find({"user_id": user_id}))
     if not notifications:
         raise HTTPException(status_code=404, detail="No notifications found")
@@ -85,13 +85,13 @@ def get_notifications():
 
 # Get unread notifications
 @app.get("/notifications/unread/{user_id}", response_model=list[GetNotificationsWithoutState], status_code=200)
-def get_unread_notifications():
+def get_unread_notifications(user_id: str):
     notifications = list(notifications_collection.find({"user_id": user_id, "opened": False}))
     return [notification_helper(n) for n in notifications]
 
 #get read notifications
 @app.get("/notifications/read/{user_id}", response_model=list[GetNotificationsWithoutState], status_code=200)
-def get_read_notifications():
+def get_read_notifications(user_id: str):
     notifications = list(notifications_collection.find({"user_id": user_id, "opened": True}))
     if not notifications:
         raise HTTPException(status_code=404, detail="No read notifications found")
@@ -100,29 +100,39 @@ def get_read_notifications():
 
 @app.patch("/notifications/{notification_id}", response_model=dict, status_code=200)
 def update_notification_status(notification_id: str, update: NotificationUpdate):
-    notification = notifications_collection.find_one({"_id": ObjectId(notification_id)})
-    
+    try:
+        oid = ObjectId(notification_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid notification id")
+
+    notification = notifications_collection.find_one({"_id": oid})
     if not notification:
         raise HTTPException(status_code=404, detail="Notification not found")
-    
+
     notifications_collection.update_one(
-        {"_id": ObjectId(notification_id)},
+        {"_id": oid},
         {"$set": {"opened": update.opened}}
     )
-    
+
     return {"message": "Notification status updated"}
 
-#delete notification by id
-@app.delete("/notifications/{notification_id}", status_code=200)
-def delete_notification(notification_id: str):
-    notifications_collection.delete_one({"_id": ObjectId(notification_id)})
-    return {"message": "Notification deleted"}
 
-# delete all notifications belongin to a user
-@app.delete("/notifications/{user_id}", status_code=200)
-def delete_notifications():
-    notifications_collection.delete_many({"user_id": user_id})
-    return {"message": "Notifications deleted"}
+@app.delete("/notifications/{identifier}", status_code=200)
+def delete_notifications(identifier: str):
+    # try delete by ObjectId
+    try:
+        oid = ObjectId(identifier)
+        result = notifications_collection.delete_one({"_id": oid})
+        if result.deleted_count:
+            return {"message": "Notification deleted"}
+        # if no document found for this ObjectId, fall through to treat identifier as user_id
+    except Exception:
+        # not a valid ObjectId, treat as user_id
+        pass
+
+    # delete by user_id
+    res = notifications_collection.delete_many({"user_id": identifier})
+    return {"message": f"Notifications deleted ({res.deleted_count})"}
 
 #delete notifications by related_id
 @app.delete("/notifications/related/{related_id}")
