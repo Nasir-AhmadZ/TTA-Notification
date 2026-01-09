@@ -11,7 +11,41 @@ load_dotenv()
 from .models import notification_helper
 from .schemas import GetNotificationsWithoutState, Notification, NotificationUpdate
 from .configurations import db, notifications_collection
+from . import consumer 
+from contextlib import asynccontextmanager
 app = FastAPI(title="Notifications API")
+
+#******************************RabbitMQ stuff******************************************
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    consumer_task = None
+
+    # Start the consumer within lifespan so it reliably runs under uvicorn
+    try:
+        print("Starting RabbitMQ consumer task")
+        consumer_task = asyncio.create_task(consumer.consume())
+        app.state.consumer_task = consumer_task
+    except Exception as e:
+        print(f"ERROR: Failed to start consumer task: {e}")
+
+    try:
+        yield
+    finally:
+        # Shutdown: cancel consumer and close RabbitMQ publisher connection
+        try:
+            task = getattr(app.state, "consumer_task", None)
+            if task:
+                task.cancel()
+        except Exception:
+            print("ERROR: Error while cancelling consumer task")
+
+        try:
+            if connected:
+                publisher.close()
+        except Exception:
+            print("ERROR: Error while closing RabbitMQ connection")
+
+app = FastAPI(title="Notifications API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,7 +55,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
  
-currentUser = "691c8bf8d691e46d00068bf3"
+#currentUser = "691c8bf8d691e46d00068bf3"
 
 RABBIT_URL = os.getenv("RABBIT_URL")
 EXCHANGE_NAME = "notificiations_topic"
@@ -36,7 +70,7 @@ if not RABBIT_URL:
 #get all notifications
 @app.get("/notifications", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_notifications():
-    notifications = list(notifications_collection.find({"user_id": currentUser}))
+    notifications = list(notifications_collection.find({"user_id": consumer.currentUser}))
     if not notifications:
         raise HTTPException(status_code=404, detail="No notifications found")
     return [notification_helper(n) for n in notifications]
@@ -45,13 +79,13 @@ def get_notifications():
 # Get unread notifications
 @app.get("/notifications/unread", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_unread_notifications():
-    notifications = list(notifications_collection.find({"user_id": currentUser, "opened": False}))
+    notifications = list(notifications_collection.find({"user_id": consumer.currentUser, "opened": False}))
     return [notification_helper(n) for n in notifications]
 
 #get read notifications
 @app.get("/notifications/read", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_read_notifications():
-    notifications = list(notifications_collection.find({"user_id": currentUser, "opened": True}))
+    notifications = list(notifications_collection.find({"user_id": consumer.currentUser, "opened": True}))
     if not notifications:
         raise HTTPException(status_code=404, detail="No read notifications found")
     return [notification_helper(n) for n in notifications]
@@ -80,7 +114,7 @@ def delete_notification(notification_id: str):
 # delete all notifications belongin to a user
 @app.delete("/notifications", status_code=200)
 def delete_notifications():
-    notifications_collection.delete_many({"user_id": currentUser})
+    notifications_collection.delete_many({"user_id": consumer.currentUser})
     return {"message": "Notifications deleted"}
 
 #delete notifications by related_id
