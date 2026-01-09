@@ -11,7 +11,6 @@ load_dotenv()
 from .models import notification_helper
 from .schemas import GetNotificationsWithoutState, Notification, NotificationUpdate
 from .configurations import db, notifications_collection
-from . import consumer
 from . import consumerNotif
 from contextlib import asynccontextmanager
 
@@ -25,9 +24,6 @@ async def lifespan(app: FastAPI):
 
     try:
         print("Starting background RabbitMQ consumers")
-        # user events consumer (sets user_id)
-        user_task = asyncio.create_task(consumer.consume())
-        tasks.append(user_task)
 
         # notifications consumer (inserts into notifications_collection)
         notif_task = asyncio.create_task(consumerNotif.consume())
