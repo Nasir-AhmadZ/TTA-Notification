@@ -19,5 +19,5 @@ variable "container_port" {
 variable "replicas" {
   description = "How many replicas to run"
   type        = number
-  default     = 2
+  default     = 1
 }

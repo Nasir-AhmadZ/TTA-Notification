@@ -49,7 +49,7 @@ resource "kubernetes_deployment" "nginx" {
   }
 
   spec {
-    replicas = 2
+    replicas = var.replicas
     selector {
       match_labels = {
         App = "TTA-Notif-app"
