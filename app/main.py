@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
     try:
         print("Starting background RabbitMQ consumers")
-        # user events consumer (sets consumer.currentUser)
+        # user events consumer (sets user_id)
         user_task = asyncio.create_task(consumer.consume())
         tasks.append(user_task)
 
@@ -75,26 +75,26 @@ if not RABBIT_URL:
 
 #******************************Notification endpoints**********************************
 #get all notifications
-@app.get("/notifications", response_model=list[GetNotificationsWithoutState], status_code=200)
+@app.get("/notifications/{user_id}", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_notifications():
-    notifications = list(notifications_collection.find({"user_id": consumer.currentUser}))
+    notifications = list(notifications_collection.find({"user_id": user_id}))
     if not notifications:
         raise HTTPException(status_code=404, detail="No notifications found")
     return [notification_helper(n) for n in notifications]
 
 
 # Get unread notifications
-@app.get("/notifications/unread", response_model=list[GetNotificationsWithoutState], status_code=200)
+@app.get("/notifications/unread/{user_id}", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_unread_notifications():
-    notifications = list(notifications_collection.find({"user_id": consumer.currentUser, "opened": False}))
+    notifications = list(notifications_collection.find({"user_id": user_id, "opened": False}))
     return [notification_helper(n) for n in notifications]
 
 #get read notifications
-@app.get("/notifications/read", response_model=list[GetNotificationsWithoutState], status_code=200)
+@app.get("/notifications/read/{user_id}", response_model=list[GetNotificationsWithoutState], status_code=200)
 def get_read_notifications():
-    notifications = list(notifications_collection.find({"user_id": consumer.currentUser, "opened": True}))
-    #if not notifications:
-       #raise HTTPException(status_code=404, detail="No read notifications found")
+    notifications = list(notifications_collection.find({"user_id": user_id, "opened": True}))
+    if not notifications:
+        raise HTTPException(status_code=404, detail="No read notifications found")
     return [notification_helper(n) for n in notifications]
 
 
@@ -119,9 +119,9 @@ def delete_notification(notification_id: str):
     return {"message": "Notification deleted"}
 
 # delete all notifications belongin to a user
-@app.delete("/notifications", status_code=200)
+@app.delete("/notifications/{user_id}", status_code=200)
 def delete_notifications():
-    notifications_collection.delete_many({"user_id": consumer.currentUser})
+    notifications_collection.delete_many({"user_id": user_id})
     return {"message": "Notifications deleted"}
 
 #delete notifications by related_id
