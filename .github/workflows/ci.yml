@@ -14,7 +14,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Tests (pytest + coverage)
-        run: pytest --cov=app --cov-fail-under=70 --cov-report=term-missing
+        run: PYTHONPATH=. pytest --cov=app --cov-fail-under=70 --cov-report=term-missing
 
   docker:
     runs-on: ubuntu-latest
