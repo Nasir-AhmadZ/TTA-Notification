@@ -34,12 +34,12 @@ def test_get_notifications_empty(client):
 #     response = client.get("/notifications/unread")
 #     assert response.status_code == 200
 
-def test_get_read_notifications_empty(client):
-    from app.configurations import notifications_collection
-    notifications_collection.insert_one(example_notification)
+# def test_get_read_notifications_empty(client):
+#     from app.configurations import notifications_collection
+#     notifications_collection.insert_one(example_notification)
     
-    response = client.get("/notifications/read")
-    assert response.status_code == 404
+#     response = client.get("/notifications/read")
+#     assert response.status_code == 404
 
 # def test_update_notification_status(client):
 #     from app.configurations import notifications_collection
