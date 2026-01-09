@@ -135,50 +135,69 @@ def build_message_text(event_type: str, data: dict) -> str:
 
 
 async def consume_notifications():
-    connection = await aio_pika.connect_robust(RABBIT_URL)
-    channel = await connection.channel()
-
-    exchange = await channel.declare_exchange(EXCHANGE_NAME, aio_pika.ExchangeType.TOPIC)
-    queue = await channel.declare_queue("all_notifications", durable=True)
+    try:
+        print(f"Connecting to RabbitMQ: {RABBIT_URL}")
+        connection = await aio_pika.connect_robust(RABBIT_URL)
+        print("Connected to RabbitMQ successfully")
         
-    print("waiting for messages on all_notifications ...")
-    await queue.bind(exchange, routing_key="#")
-    
-    async with queue.iterator() as q:
-        async for message in q:
-            async with message.process():
-                raw = message.body.decode("utf-8")
-                payload = json.loads(raw)
+        async with connection:
+            channel = await connection.channel()
+            print(f"Declaring exchange: {EXCHANGE_NAME}")
+            
+            exchange = await channel.declare_exchange(EXCHANGE_NAME, aio_pika.ExchangeType.TOPIC)
+            queue = await channel.declare_queue("all_notifications", durable=True)
+            
+            print("Binding queue to exchange with routing_key='#'")
+            await queue.bind(exchange, routing_key="#")
+            print("Waiting for messages on all_notifications...")
+            
+            async with queue.iterator() as q:
+                async for message in q:
+                    async with message.process():
+                        try:
+                            raw = message.body.decode("utf-8")
+                            payload = json.loads(raw)
+                            print(f"Received message: {payload}")
 
-                event_type = payload.get("event_type")
-                user_id = payload.get("data", {}).get("currentUser")
-                data = payload.get("data")
+                            event_type = payload.get("event_type")
+                            user_id = payload.get("data", {}).get("currentUser")
+                            data = payload.get("data")
 
-                if isinstance(data, dict):
-                    data = data["data"]
+                            if isinstance(data, dict) and "data" in data:
+                                data = data["data"]
 
-                if not event_type or not user_id:
-                    print("Skipping message missing event_type/currentUser:", payload)
-                    continue
+                            if not event_type or not user_id:
+                                print(f"Skipping message missing event_type/currentUser: {payload}")
+                                continue
 
-                message_text = build_message_text(event_type, data)
+                            message_text = build_message_text(event_type, data)
 
-                related_id = data.get("id") or data.get("_id")  # depending on your helper shape
+                            related_id = data.get("id") or data.get("_id")  # depending on your helper shape
 
-                notification = {
-                    "user_id": user_id,
-                    "message": message_text,
-                    "related_id": related_id,
-                    "event_type": event_type,
-                    "opened": False,
-                    "created_at": datetime.now(),
-                }
+                            notification = {
+                                "user_id": user_id,
+                                "message": message_text,
+                                "related_id": related_id,
+                                "event_type": event_type,
+                                "opened": False,
+                                "created_at": datetime.now(),
+                            }
 
-                notifications_collection.insert_one(notification)
-                print("Inserted notification:", notification)
+                            notifications_collection.insert_one(notification)
+                            print(f"Inserted notification: {notification}")
+                        except Exception as e:
+                            print(f"Error processing message: {e}")
+    except Exception as e:
+        print(f"RabbitMQ connection error: {e}")
+        await asyncio.sleep(5)
+        # Retry connection
+        asyncio.create_task(consume_notifications())
+
 
 @app.on_event("startup")
 async def startup_event():
+    print("Starting RabbitMQ consumer...")
     asyncio.create_task(consume_notifications())
+
 
 # python -m uvicorn app.main:app --reload
